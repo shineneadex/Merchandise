@@ -1,6 +1,6 @@
 const ADMIN_EMAIL = "hello@theexpressionmusic.com";
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "application/pdf"]);
-const MAX_FILE_BYTES = 4 * 1024 * 1024;
+const MAX_FILE_BYTES = 2.5 * 1024 * 1024;
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     }
     const buffer = Buffer.from(proof.base64, "base64");
     if (!buffer.length || buffer.length > MAX_FILE_BYTES) {
-      return res.status(400).json({ error: "Proof of payment must be no larger than 4 MB." });
+      return res.status(400).json({ error: "Proof of payment must be no larger than 2.5 MB." });
     }
     const safeFilename = String(proof.name).replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
     const orderLines = items.map(item => {
