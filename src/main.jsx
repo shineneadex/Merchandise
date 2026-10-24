@@ -54,8 +54,8 @@ function App() {
       setSubmitError("Please attach your proof of payment before submitting your order.");
       return;
     }
-    if (paymentProof.size > 4 * 1024 * 1024) {
-      setSubmitError("Your file is larger than 4 MB. Please choose a smaller JPG, PNG or PDF file.");
+    if (paymentProof.size > 2.5 * 1024 * 1024) {
+      setSubmitError("Your file is larger than 2.5 MB. Please choose a smaller JPG, PNG or PDF file.");
       return;
     }
     setSubmitting(true);
@@ -165,7 +165,7 @@ function App() {
           <label>Email address<input required type="email" autoComplete="email" value={customer.email} onChange={e => setCustomer({...customer, email:e.target.value})} placeholder="you@example.com"/></label>
           <label>Delivery address<textarea required autoComplete="street-address" value={customer.address} onChange={e => setCustomer({...customer, address:e.target.value})} placeholder="House number, street, town/city" rows="3"/></label>
           <label>Postcode<input required autoComplete="postal-code" value={customer.postcode} onChange={e => setCustomer({...customer, postcode:e.target.value})} placeholder="Postcode"/></label>
-          <label>Proof of payment <span className="muted">(required)</span><input required type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" onChange={e => setPaymentProof(e.target.files?.[0] || null)} /><span className="small muted">Attach a screenshot or receipt (JPG, PNG or PDF, maximum 4 MB). Please make your bank transfer before submitting.</span></label>
+          <label>Proof of payment <span className="muted">(required)</span><input required type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" onChange={e => setPaymentProof(e.target.files?.[0] || null)} /><span className="small muted">Attach a screenshot or receipt (JPG, PNG or PDF, maximum 2.5 MB). Please make your bank transfer before submitting.</span></label>
           <label>Order notes <span className="muted">(optional)</span><textarea value={customer.notes} onChange={e => setCustomer({...customer, notes:e.target.value})} placeholder="Any delivery or order notes" rows="2"/></label>
           {submitError && <p className="submit-error" role="alert">{submitError}</p>}
           <button className="primary-button full" type="submit" disabled={submitting}>{submitting ? "Submitting order…" : "Submit order and proof of payment"} <ArrowRight size={16}/></button>
