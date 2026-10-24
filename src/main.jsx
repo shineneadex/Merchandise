@@ -24,6 +24,9 @@ function App() {
   const [customer, setCustomer] = useState({ name: "", email: "", address: "", postcode: "", notes: "" });
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderRef, setOrderRef] = useState("");
+  const [paymentProof, setPaymentProof] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const filteredProducts = useMemo(() => products.filter(p => filter === "All" || p.design === filter), [filter]);
   const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
@@ -44,12 +47,47 @@ function App() {
   const removeItem = key => setCart(current => current.filter(i => i.key !== key));
   const go = next => { setPage(next); setMobileMenu(false); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
-  const placeOrder = (e) => {
+  const placeOrder = async (e) => {
     e.preventDefault();
-    const ref = `EMI-${Date.now().toString().slice(-6)}`;
-    setOrderRef(ref);
-    setOrderPlaced(true);
-    setPage("confirmation");
+    setSubmitError("");
+    if (!paymentProof) {
+      setSubmitError("Please attach your proof of payment before submitting your order.");
+      return;
+    }
+    if (paymentProof.size > 4 * 1024 * 1024) {
+      setSubmitError("Your file is larger than 4 MB. Please choose a smaller JPG, PNG or PDF file.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const proofBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1]);
+        reader.onerror = () => reject(new Error("We couldn't read your proof of payment. Please try again."));
+        reader.readAsDataURL(paymentProof);
+      });
+      const ref = `EMI-${Date.now().toString().slice(-6)}`;
+      const response = await fetch("/api/place-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderRef: ref,
+          customer,
+          items: cart.map(({ name, color, size, qty }) => ({ name, color, size, qty, unitPrice: 25 })),
+          total: subtotal,
+          proof: { name: paymentProof.name, type: paymentProof.type, base64: proofBase64 }
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "We couldn't submit your order. Please try again.");
+      setOrderRef(ref);
+      setOrderPlaced(true);
+      setPage("confirmation");
+    } catch (error) {
+      setSubmitError(error.message || "Order submission failed. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return <div className="app">
@@ -127,9 +165,11 @@ function App() {
           <label>Email address<input required type="email" autoComplete="email" value={customer.email} onChange={e => setCustomer({...customer, email:e.target.value})} placeholder="you@example.com"/></label>
           <label>Delivery address<textarea required autoComplete="street-address" value={customer.address} onChange={e => setCustomer({...customer, address:e.target.value})} placeholder="House number, street, town/city" rows="3"/></label>
           <label>Postcode<input required autoComplete="postal-code" value={customer.postcode} onChange={e => setCustomer({...customer, postcode:e.target.value})} placeholder="Postcode"/></label>
+          <label>Proof of payment <span className="muted">(required)</span><input required type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" onChange={e => setPaymentProof(e.target.files?.[0] || null)} /><span className="small muted">Attach a screenshot or receipt (JPG, PNG or PDF, maximum 4 MB). Please make your bank transfer before submitting.</span></label>
           <label>Order notes <span className="muted">(optional)</span><textarea value={customer.notes} onChange={e => setCustomer({...customer, notes:e.target.value})} placeholder="Any delivery or order notes" rows="2"/></label>
-          <button className="primary-button full" type="submit">Review payment details <ArrowRight size={16}/></button>
-          <p className="small muted">Submitting creates an order summary in this browser. It does not send your details to a server or process payment.</p>
+          {submitError && <p className="submit-error" role="alert">{submitError}</p>}
+          <button className="primary-button full" type="submit" disabled={submitting}>{submitting ? "Submitting order…" : "Submit order and proof of payment"} <ArrowRight size={16}/></button>
+          <p className="small muted">Your order details and proof will be emailed to the Expression Music team. Your order remains awaiting payment verification until the transfer is confirmed.</p>
         </form>
         <aside className="summary"><h2>Your order</h2>{cart.map(item => <div className="checkout-item" key={item.key}><img src={item.image} alt=""/><div><strong>{item.name}</strong><p className="muted">{item.color} · {item.size} × {item.qty}</p></div><span>{money(item.qty*25)}</span></div>)}<div className="summary-line total"><span>Total</span><strong>{money(subtotal)}</strong></div><div className="payment-note"><span className="payment-icon">£</span><div><strong>Bank transfer</strong><p className="muted small">Account details will be shown with your order reference after you continue.</p></div></div></aside>
       </div>}
@@ -147,7 +187,7 @@ function App() {
       </div>
       <div className="order-review"><h2>Items in your order</h2>{cart.map(item => <div className="summary-line" key={item.key}><span>{item.name} · {item.color}, {item.size} × {item.qty}</span><strong>{money(item.qty*25)}</strong></div>)}<div className="summary-line total"><span>Total</span><strong>{money(subtotal)}</strong></div></div>
       <div className="confirm-actions"><button className="primary-button" onClick={() => window.print()}>Print order summary</button><button className="secondary-button" onClick={() => {setCart([]); setOrderPlaced(false); go("shop");}}>Return to shop</button></div>
-      <p className="small muted">This demo storefront stores no order on a server and does not email your order automatically. Please keep this summary for your records and contact the team through your usual channel if you need to confirm receipt.</p>
+      <p className="small muted">A confirmation email has been requested for your order. The team will review your proof of payment and confirm once the transfer has been verified. If you do not receive the email, check your spam folder.</p>
     </main>}
 
     {page === "about" && <main className="page section narrow informational"><p className="eyebrow">OUR HEART</p><h1 className="page-title">Expression beyond the music.</h1><p className="lead">The Expression Music International exists to inspire, worship and impact lives through the message of Jesus Christ.</p><div className="about-logo"><img src="/images/expression-music-logo.png" alt="The Expression Music International logo"/></div><h2>Inspire. Worship. Impact.</h2><p className="muted">Our faith-inspired merchandise carries the message beyond the stage and into everyday life. Each design is a conversation starter and a reminder of the hope we have in Christ.</p><button className="primary-button" onClick={() => go("shop")}>Shop the collection <ArrowRight size={16}/></button></main>}
